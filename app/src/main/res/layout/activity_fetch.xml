@@ -20,6 +20,18 @@
         app:layout_constraintWidth_percent="0.8"
         android:layout_margin="16dp"/>
 
+    <!--    添加显示已添加图片个数，需要修改-->
+    <!--    <TextView-->
+    <!--        android:id="@+id/SelectedNum"-->
+    <!--        android:layout_width="0dp"-->
+    <!--        android:layout_height="0dp"-->
+    <!--        android:text="20/20"-->
+    <!--        app:layout_constraintStart_toStartOf="parent"-->
+    <!--        app:layout_constraintEnd_toStartOf="@+id/fetchButton"-->
+    <!--        app:layout_constraintTop_toTopOf="parent"-->
+    <!--        app:layout_constraintWidth_percent="0.8"-->
+    <!--        android:layout_margin="8dp"/>-->
+
     <!-- Fetch Button -->
     <Button
         android:id="@+id/fetchButton"

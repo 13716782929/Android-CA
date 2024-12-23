@@ -29,6 +29,7 @@ class FetchActivity : AppCompatActivity() {
     private lateinit var imageAdapter: ImageAdapter
 
     private val imageList = mutableListOf<String>() // 用于保存图片文件路径的列表
+    private val selectedImagesList = mutableListOf<String>() // 用于保存用户选择的图片文件路径的列表
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -152,11 +153,31 @@ class FetchActivity : AppCompatActivity() {
 
             if (bitmap != null) {
                 holder.imageView.setImageBitmap(bitmap)
+                holder.imageView.setOnClickListener{
+                    if (selectedImagesList.contains(filePath)) {
+                        selectedImagesList.remove(filePath)
+                        Toast.makeText(this@FetchActivity, "Selected images: ${selectedImagesList.size}", Toast.LENGTH_SHORT).show()
+                        holder.imageView.setImageBitmap(bitmap)
+                        return@setOnClickListener
+                    }else{
+                        if(selectedImagesList.size <= 5){
+                            selectedImagesList.add(filePath)
+                            holder.imageView.setImageResource(android.R.drawable.checkbox_on_background)
+                            Toast.makeText(this@FetchActivity, "Selected images: ${selectedImagesList.size}", Toast.LENGTH_SHORT).show()
+                            return@setOnClickListener
+                        }
+                    }
+
+                }
             } else {
                 println("Failed to decode image from path: $filePath")
             }
         }
 
         override fun getItemCount(): Int = images.size
+    }
+
+    fun showSelectedImages() : List<String> {
+        return selectedImagesList
     }
 }
