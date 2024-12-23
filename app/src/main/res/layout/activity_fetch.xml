@@ -5,7 +5,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".FetchActivity">
+    tools:context=".FetchActivity"
+    android:padding="16dp">
 
     <!-- URL Input Field -->
     <EditText
@@ -14,23 +15,14 @@
         android:layout_height="wrap_content"
         android:hint="Enter URL"
         android:inputType="textUri"
+        android:padding="12dp"
+        android:minHeight="48dp"
+        android:textSize="16sp"
+        android:layout_marginTop="12dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@+id/fetchButton"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintWidth_percent="0.8"
-        android:layout_margin="16dp"/>
-
-    <!--    添加显示已添加图片个数，需要修改-->
-    <!--    <TextView-->
-    <!--        android:id="@+id/SelectedNum"-->
-    <!--        android:layout_width="0dp"-->
-    <!--        android:layout_height="0dp"-->
-    <!--        android:text="20/20"-->
-    <!--        app:layout_constraintStart_toStartOf="parent"-->
-    <!--        app:layout_constraintEnd_toStartOf="@+id/fetchButton"-->
-    <!--        app:layout_constraintTop_toTopOf="parent"-->
-    <!--        app:layout_constraintWidth_percent="0.8"-->
-    <!--        android:layout_margin="8dp"/>-->
+        app:layout_constraintWidth_percent="0.75" />
 
     <!-- Fetch Button -->
     <Button
@@ -38,21 +30,27 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Fetch"
+        android:textStyle="bold"
+        android:backgroundTint="#6200EE"
+        android:textColor="@android:color/white"
+        android:paddingVertical="12dp"
+        android:layout_marginTop="8dp"
         app:layout_constraintStart_toEndOf="@id/urlInput"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="@id/urlInput"
-        android:layout_margin="16dp"/>
+        android:layout_marginStart="8dp" />
 
-    <!-- Progress Bar -->
-    <com.google.android.material.progressindicator.LinearProgressIndicator
-        android:id="@+id/progressBar"
-        android:layout_width="0dp"
+    <!-- Selected Images Count -->
+    <TextView
+        android:id="@+id/SelectedNum"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:visibility="gone"
+        android:text="Selected: 0/6"
+        android:textSize="25sp"
+        android:textColor="@android:color/black"
+        android:layout_marginTop="12dp"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/urlInput"
-        android:layout_marginTop="8dp"/>
+        app:layout_constraintTop_toBottomOf="@id/urlInput" />
 
     <!-- RecyclerView for Image Grid -->
     <androidx.recyclerview.widget.RecyclerView
@@ -61,8 +59,35 @@
         android:layout_height="0dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/SelectedNum"
+        app:layout_constraintBottom_toTopOf="@id/progressBar"
+        android:layout_marginTop="24dp"
+        app:layout_constraintHeight_percent="0.65" />
+
+    <!-- Progress Bar -->
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/progressBar"
+        android:layout_width="300dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/recyclerView"
+        android:layout_marginTop="8dp"
+        app:trackThickness="60dp"/>
+
+    <!-- Progress Text -->
+    <TextView
+        android:id="@+id/progressText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="25sp"
+        android:textAlignment="center"
+        android:textColor="@android:color/darker_gray"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@id/progressBar"
-        app:layout_constraintBottom_toBottomOf="parent"
-        android:layout_margin="16dp"/>
+        android:layout_marginTop="4dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
