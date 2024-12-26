@@ -1,6 +1,5 @@
 package iss.nus.edu.sg.fragments.workshop.fetchactivitycode
 
-import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.os.Environment
@@ -21,12 +20,12 @@ import org.jsoup.Jsoup
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.UUID
+import java.util.*
 import java.util.concurrent.Executors
-import java.util.concurrent.Future
-
+import java.util.concurrent.TimeUnit
 
 class FetchActivity : AppCompatActivity() {
 
@@ -40,8 +39,8 @@ class FetchActivity : AppCompatActivity() {
     private val imageList = mutableListOf<String>() // 保存图片文件路径的列表
     private val selectedImagesList = mutableListOf<String>() // 保存用户选择的图片文件路径的列表
 
-    private val executor = Executors.newSingleThreadExecutor()
-    private var currentTask: Future<*>? = null
+    private var executor = Executors.newSingleThreadExecutor()
+    private var currentTaskId: UUID? = null // 当前任务的唯一标识符
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,35 +67,40 @@ class FetchActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            // 取消当前下载任务
-            currentTask?.cancel(true)
-
-            // 清空 UI
-            clearDownloadState()
-
-            // 开始新的下载任务
-            fetchImagesFromWebPage(url)
+            // 取消当前任务
+            currentTaskId = UUID.randomUUID() // 创建新的任务 ID
+            clearDownloadState() // 清空 UI
+            fetchImagesFromWebPage(url, currentTaskId!!) // 启动新的下载任务
         }
     }
 
     // 清空下载状态
     private fun clearDownloadState() {
-        imageList.clear()
-        selectedImagesList.clear()
-        imageAdapter.notifyDataSetChanged()
-        progressBar.visibility = View.GONE
-        progressText.visibility = View.GONE
-        updateSelectedCount()
+        // 中断旧任务
+        currentTaskId = UUID.randomUUID() // 创建新任务的 ID
+        executor.shutdownNow() // 停止当前所有线程
+        executor.awaitTermination(2, TimeUnit.SECONDS) // 等待线程停止
+        executor = Executors.newSingleThreadExecutor() // 重新创建线程池
+
+        // 清空列表和 UI
+        runOnUiThread {
+            imageList.clear()
+            selectedImagesList.clear()
+            imageAdapter.notifyDataSetChanged()
+            progressBar.visibility = View.GONE
+            progressText.visibility = View.GONE
+            updateSelectedCount()
+        }
     }
 
-    private fun fetchImagesFromWebPage(webPageUrl: String) {
-        currentTask = executor.submit {
+    private fun fetchImagesFromWebPage(webPageUrl: String, taskId: UUID) {
+        executor.submit {
             try {
                 val document = Jsoup.connect(webPageUrl)
                     .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                     .get()
                 val imageElements = document.select("img[src]")
-                val imageUrls = imageElements.mapNotNull { it.attr("abs:src") }.take(20)
+                val imageUrls = imageElements.mapNotNull { it.attr("abs:src") }.distinct().take(20)
 
                 runOnUiThread {
                     progressBar.max = imageUrls.size
@@ -107,7 +111,7 @@ class FetchActivity : AppCompatActivity() {
                 }
 
                 for ((index, imageUrl) in imageUrls.withIndex()) {
-                    if (Thread.currentThread().isInterrupted) {
+                    if (currentTaskId != taskId) { // 检查是否是当前任务
                         break
                     }
 
@@ -116,29 +120,38 @@ class FetchActivity : AppCompatActivity() {
 
                     if (downloadImage(imageUrl, file)) {
                         runOnUiThread {
-                            imageList.add(file.absolutePath)
-                            imageAdapter.notifyDataSetChanged()
+                            if (currentTaskId == taskId && imageList.size < 20) { // 确保列表大小
+                                imageList.add(file.absolutePath)
+                                imageAdapter.notifyItemInserted(imageList.size - 1)
 
-                            progressBar.progress = index + 1
-                            progressText.text = "Downloading ${index + 1} of ${imageUrls.size} images..."
+                                progressBar.progress = index + 1
+                                progressText.text = "Downloading ${index + 1} of ${imageUrls.size} images..."
+                            }
                         }
                     }
                 }
 
-                runOnUiThread {
-                    progressBar.visibility = View.GONE
-                    progressText.visibility = View.GONE
+                if (currentTaskId == taskId) {
+                    runOnUiThread {
+                        progressBar.visibility = View.GONE
+                        progressText.visibility = View.GONE
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
                 runOnUiThread {
-                    Toast.makeText(this, "Failed to fetch images from the webpage", Toast.LENGTH_SHORT).show()
-                    progressBar.visibility = View.GONE
-                    progressText.visibility = View.GONE
+                    if (currentTaskId == taskId) {
+                        Toast.makeText(this, "Failed to fetch images from the webpage", Toast.LENGTH_SHORT).show()
+                        progressBar.visibility = View.GONE
+                        progressText.visibility = View.GONE
+                    }
                 }
             }
         }
     }
+
+
+
 
     private fun getFileExtension(str: String): String {
         return str.substringAfterLast(".", "")
@@ -152,6 +165,9 @@ class FetchActivity : AppCompatActivity() {
 
     private fun downloadImage(imgURL: String, file: File): Boolean {
         var conn: HttpURLConnection? = null
+        var inp: InputStream? = null
+        var outp: FileOutputStream? = null
+
         return try {
             val url = URL(imgURL)
             conn = url.openConnection() as HttpURLConnection
@@ -159,18 +175,37 @@ class FetchActivity : AppCompatActivity() {
             conn.setRequestProperty("User-Agent", "Mozilla/5.0")
 
             if (conn.responseCode == HttpURLConnection.HTTP_OK) {
-                outputToFile(conn, file)
+                inp = conn.inputStream
+                outp = FileOutputStream(file)
+
+                val buf = ByteArray(4096)
+                var bytesRead = inp.read(buf)
+
+                while (bytesRead != -1) {
+                    if (Thread.interrupted()) { // 检查是否被中断
+                        throw InterruptedException("Download interrupted")
+                    }
+                    outp.write(buf, 0, bytesRead)
+                    bytesRead = inp.read(buf)
+                }
                 true
             } else {
                 false
             }
+        } catch (e: InterruptedException) {
+            // 如果被中断，删除已下载的文件
+            file.delete()
+            false
         } catch (e: Exception) {
             e.printStackTrace()
             false
         } finally {
+            inp?.close()
+            outp?.close()
             conn?.disconnect()
         }
     }
+
 
     @Throws(IOException::class)
     private fun outputToFile(conn: HttpURLConnection, file: File) {
@@ -231,13 +266,6 @@ class FetchActivity : AppCompatActivity() {
     private fun updateSelectedCount() {
         runOnUiThread {
             selectedNumTextView.text = "Selected: ${selectedImagesList.size}/6"
-            //当选中数量达到6个，转跳到PlayActivity
-//            if (selectedImagesList.size == 6) {
-//                // 启动 PlayActivity
-//                val intent = Intent(this, PlayActivity::class.java)
-//                intent.putStringArrayListExtra("selectedImages", ArrayList(selectedImagesList))
-//                startActivity(intent)
-//            }
         }
     }
 
