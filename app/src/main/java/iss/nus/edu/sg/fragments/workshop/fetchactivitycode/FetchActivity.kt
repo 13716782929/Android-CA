@@ -19,7 +19,6 @@ import com.google.android.material.progressindicator.LinearProgressIndicator
 import org.jsoup.Jsoup
 import java.io.File
 import java.io.FileOutputStream
-import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -41,6 +40,7 @@ class FetchActivity : AppCompatActivity() {
 
     private var executor = Executors.newSingleThreadExecutor()
     private var currentTaskId: UUID? = null // 当前任务的唯一标识符
+    private var imageCounter = 0 // 图片计数器
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,13 +76,11 @@ class FetchActivity : AppCompatActivity() {
 
     // 清空下载状态
     private fun clearDownloadState() {
-        // 中断旧任务
         currentTaskId = UUID.randomUUID() // 创建新任务的 ID
         executor.shutdownNow() // 停止当前所有线程
         executor.awaitTermination(2, TimeUnit.SECONDS) // 等待线程停止
         executor = Executors.newSingleThreadExecutor() // 重新创建线程池
 
-        // 清空列表和 UI
         runOnUiThread {
             imageList.clear()
             selectedImagesList.clear()
@@ -90,7 +88,12 @@ class FetchActivity : AppCompatActivity() {
             progressBar.visibility = View.GONE
             progressText.visibility = View.GONE
             updateSelectedCount()
+            imageCounter = 0 // 重置图片计数器
         }
+    }
+
+    private fun clearDownloadDir(){
+
     }
 
     private fun fetchImagesFromWebPage(webPageUrl: String, taskId: UUID) {
@@ -99,8 +102,13 @@ class FetchActivity : AppCompatActivity() {
                 val document = Jsoup.connect(webPageUrl)
                     .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                     .get()
+                // 过滤掉 .svg 格式的图片
                 val imageElements = document.select("img[src]")
-                val imageUrls = imageElements.mapNotNull { it.attr("abs:src") }.distinct().take(20)
+                val imageUrls = imageElements
+                    .mapNotNull { it.attr("abs:src") }
+                    .filter { !it.endsWith(".svg", ignoreCase = true) } // 排除 .svg 文件
+                    .distinct()
+                    .take(20)
 
                 runOnUiThread {
                     progressBar.max = imageUrls.size
@@ -115,8 +123,7 @@ class FetchActivity : AppCompatActivity() {
                         break
                     }
 
-                    val ext = getFileExtension(imageUrl)
-                    val file = createDestFile(ext)
+                    val file = createDestFile() // 使用新的命名规则
 
                     if (downloadImage(imageUrl, file)) {
                         runOnUiThread {
@@ -150,15 +157,8 @@ class FetchActivity : AppCompatActivity() {
         }
     }
 
-
-
-
-    private fun getFileExtension(str: String): String {
-        return str.substringAfterLast(".", "")
-    }
-
-    private fun createDestFile(ext: String): File {
-        val filename = UUID.randomUUID().toString() + if (ext.isNotEmpty()) ".$ext" else ""
+    private fun createDestFile(): File {
+        val filename = "image_${++imageCounter}.jpg" // 生成有序文件名
         val dir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
         return File(dir, filename)
     }
@@ -193,7 +193,6 @@ class FetchActivity : AppCompatActivity() {
                 false
             }
         } catch (e: InterruptedException) {
-            // 如果被中断，删除已下载的文件
             file.delete()
             false
         } catch (e: Exception) {
@@ -204,24 +203,6 @@ class FetchActivity : AppCompatActivity() {
             outp?.close()
             conn?.disconnect()
         }
-    }
-
-
-    @Throws(IOException::class)
-    private fun outputToFile(conn: HttpURLConnection, file: File) {
-        val inp = conn.inputStream
-        val outp = FileOutputStream(file)
-
-        val buf = ByteArray(4096)
-        var bytesRead = inp.read(buf)
-
-        while (bytesRead != -1) {
-            outp.write(buf, 0, bytesRead)
-            bytesRead = inp.read(buf)
-        }
-
-        inp.close()
-        outp.close()
     }
 
     inner class ImageAdapter(private val images: List<String>) : RecyclerView.Adapter<ImageAdapter.ImageViewHolder>() {
