@@ -24,6 +24,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.*
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 
 class FetchActivity : AppCompatActivity() {
@@ -39,6 +40,7 @@ class FetchActivity : AppCompatActivity() {
     private val selectedImagesList = mutableListOf<String>() // 保存用户选择的图片文件路径的列表
 
     private var executor = Executors.newSingleThreadExecutor()
+    private var deleteTask : Future<*>? = null
     private var currentTaskId: UUID? = null // 当前任务的唯一标识符
     private var imageCounter = 0 // 图片计数器
 
@@ -70,7 +72,14 @@ class FetchActivity : AppCompatActivity() {
             // 取消当前任务
             currentTaskId = UUID.randomUUID() // 创建新的任务 ID
             clearDownloadState() // 清空 UI
-            fetchImagesFromWebPage(url, currentTaskId!!) // 启动新的下载任务
+
+            try {
+                deleteTask?.get()
+                fetchImagesFromWebPage(url, currentTaskId!!)
+            }catch (e:Exception){
+                e.printStackTrace()
+            }
+             // 启动新的下载任务
         }
     }
 
@@ -80,6 +89,10 @@ class FetchActivity : AppCompatActivity() {
         executor.shutdownNow() // 停止当前所有线程
         executor.awaitTermination(2, TimeUnit.SECONDS) // 等待线程停止
         executor = Executors.newSingleThreadExecutor() // 重新创建线程池
+
+        deleteTask = executor.submit{
+            deleteDownloadedFiles()
+        }
 
         runOnUiThread {
             imageList.clear()
@@ -92,9 +105,16 @@ class FetchActivity : AppCompatActivity() {
         }
     }
 
-    private fun clearDownloadDir(){
-
-    }
+    private fun deleteDownloadedFiles() {
+        val dir = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        if (dir != null && dir.exists()) {
+            dir.listFiles()?.forEach { file ->
+                file.delete()
+            }
+        } else {
+            Toast.makeText(this, "No files to delete.", Toast.LENGTH_SHORT).show()
+            }
+        }
 
     private fun fetchImagesFromWebPage(webPageUrl: String, taskId: UUID) {
         executor.submit {
